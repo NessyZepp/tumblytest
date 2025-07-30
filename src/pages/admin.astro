@@ -5,286 +5,282 @@ const auth0ClientId = import.meta.env.PUBLIC_AUTH0_CLIENT_ID;
 
 // Check if environment variables are set
 if (!auth0Domain || !auth0ClientId) {
-  throw new Error('Auth0 environment variables are not set. Please check your .env file.');
+ throw new Error('Auth0 environment variables are not set. Please check your .env file.');
 }
 ---
 
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Content Manager - TumblysArt</title>
+ <meta charset="utf-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+ <title>Content Manager - TumblysArt</title>
 </head>
 <body>
-  <div id="app">
-    <div id="loading" style="text-align: center; padding: 50px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-      <h2 style="color: #6366f1;">Loading CMS...</h2>
-      <p style="color: #666;">Initializing...</p>
-      <div style="margin-top: 20px;">
-        <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #6366f1; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-      </div>
-    </div>
-  </div>
+ <div id="app">
+   <div id="loading" style="text-align: center; padding: 50px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+     <h2 style="color: #6366f1;">Loading CMS...</h2>
+     <p style="color: #666;">Initializing...</p>
+     <div style="margin-top: 20px;">
+       <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #6366f1; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+     </div>
+   </div>
+ </div>
 
-  <!-- Load Auth0 SDK first -->
-  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
-  
-  <!-- Load Decap CMS -->
-  <script src="https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js"></script>
-  
-  <script>
-    // Wait for both SDKs to load
-    function waitForSDKs() {
-      return new Promise((resolve) => {
-        function check() {
-          if ((window as any).auth0 && (window as any).CMS) {
+ <!-- Load Auth0 SDK first -->
+ <script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
+ 
+ <!-- Load Decap CMS -->
+ <script src="https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js"></script>
+ 
+ <script>
+   // Wait for both SDKs to load
+   function waitForSDKs() {
+     return new Promise((resolve) => {
+       function check() {
+         if ((window as any).auth0 && (window as any).CMS) {
+           resolve(true);
+         } else {
+           setTimeout(check, 100);
+         }
+       }
+       check();
+     });
+   }
 
-            resolve(true);
-          } else {
-            setTimeout(check, 100);
-          }
-        }
-        check();
-      });
-    }
+   // Auth0 configuration
+   const auth0Config = {
+     domain: `${auth0Domain}`,
+     clientId: `${auth0ClientId}`,
+     authorizationParams: {
+       redirect_uri: window.location.origin + '/admin'
+     }
+   };
 
-    // Auth0 configuration
-    const auth0Config = {
-      domain: '${auth0Domain}',
-      clientId: '${auth0ClientId}',
-      authorizationParams: {
-        redirect_uri: window.location.origin + '/admin'
-      }
-    };
+   let auth0Client: any;
 
-    let auth0Client: any;
+   // Initialize everything
+   async function init() {
+     try {
+       // Wait for SDKs to load
+       await waitForSDKs();
+       console.log('SDKs loaded successfully');
 
-    // Initialize everything
-    async function init() {
-      try {
-        // Wait for SDKs to load
-        await waitForSDKs();
-        console.log('SDKs loaded successfully');
+       // Initialize Auth0
+       auth0Client = await (window as any).auth0.createAuth0Client(auth0Config);
+       
+       // Handle redirect callback
+       if (window.location.search.includes('code=') || window.location.search.includes('error=')) {
+         await auth0Client.handleRedirectCallback();
+         window.history.replaceState({}, document.title, '/admin');
+       }
 
-        // Initialize Auth0
-        auth0Client = await (window as any).auth0.createAuth0Client(auth0Config);
-        
-        // Handle redirect callback
-        if (window.location.search.includes('code=') || window.location.search.includes('error=')) {
-          await auth0Client.handleRedirectCallback();
-          window.history.replaceState({}, document.title, '/admin');
-        }
+       // Check authentication
+       const isAuthenticated = await auth0Client.isAuthenticated();
+       
+       if (isAuthenticated) {
+         const user = await auth0Client.getUser();
+         console.log('Authenticated user:', user);
+         initCMS();
+       } else {
+         showLoginButton();
+       }
+     } catch (error) {
+       console.error('Initialization error:', error);
+       showError('Failed to initialize: ' + (error as any).message);
+     }
+   }
 
-        // Check authentication
-        const isAuthenticated = await auth0Client.isAuthenticated();
-        
-        if (isAuthenticated) {
-          const user = await auth0Client.getUser();
-          console.log('Authenticated user:', user);
-          initCMS();
-        } else {
-          showLoginButton();
-        }
-      } catch (error) {
-        console.error('Initialization error:', error);
-        showError('Failed to initialize: ' + (error as any).message);
-      }
-    }
+   // Show login button
+   function showLoginButton() {
+     const appElement = document.getElementById('app');
+     if (appElement) {
+       appElement.innerHTML = `
+         <div style="text-align: center; padding: 50px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 0 auto;">
+           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
+             <h1 style="margin: 0 0 20px 0; font-size: 28px; font-weight: 600;">TumblysArt CMS</h1>
+             <p style="margin: 0 0 30px 0; opacity: 0.9; font-size: 16px;">Manage your website content</p>
+             <button 
+               id="loginBtn" 
+               style="background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.3); padding: 12px 24px; border-radius: 8px; font-size: 16px; cursor: pointer; transition: all 0.3s;"
+             >
+               🔐 Log In to Continue
+             </button>
+           </div>
+           <p style="margin-top: 20px; color: #666; font-size: 14px;">Secure authentication powered by Auth0</p>
+         </div>
+       `;
+     }
+     
+     const loginBtn = document.getElementById('loginBtn');
+     if (loginBtn) {
+       loginBtn.addEventListener('click', () => {
+         auth0Client.loginWithRedirect();
+       });
+     }
+   }
 
-    // Show login button
-    function showLoginButton() {
-      const appElement = document.getElementById('app');
-      if (appElement) {
-        appElement.innerHTML = `
-          <div style="text-align: center; padding: 50px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 0 auto;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
-              <h1 style="margin: 0 0 20px 0; font-size: 28px; font-weight: 600;">TumblysArt CMS</h1>
-              <p style="margin: 0 0 30px 0; opacity: 0.9; font-size: 16px;">Manage your website content</p>
-              <button 
-                id="loginBtn" 
-                style="background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.3); padding: 12px 24px; border-radius: 8px; font-size: 16px; cursor: pointer; transition: all 0.3s;"
-              >
-                🔐 Log In to Continue
-              </button>
-            </div>
-            <p style="margin-top: 20px; color: #666; font-size: 14px;">Secure authentication powered by Auth0</p>
-          </div>
-        `;
-      }
-      
-      const loginBtn = document.getElementById('loginBtn');
-      if (loginBtn) {
-        loginBtn.addEventListener('click', () => {
-          auth0Client.loginWithRedirect();
-        });
-      }
-    }
+   // Show error message
+   function showError(message: any) {
+     const appElement = document.getElementById('app');
+     if (appElement) {
+       appElement.innerHTML = `
+         <div style="text-align: center; padding: 50px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+           <div style="background: #fee2e2; border: 1px solid #fecaca; color: #dc2626; padding: 20px; border-radius: 8px; max-width: 500px; margin: 0 auto;">
+             <h2 style="margin: 0 0 10px 0;">❌ Error</h2>
+             <p style="margin: 0 0 20px 0;">${message}</p>
+             <button 
+               onclick="location.reload()" 
+               style="background: #dc2626; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer;"
+             >
+               Try Again
+             </button>
+           </div>
+         </div>
+       `;
+     }
+   }
+   
+   // Initialize Decap CMS with inline config
+   function initCMS() {
+     console.log('Initializing Decap CMS...');
+     const appElement = document.getElementById('app');
+     if (appElement) {
+       appElement.innerHTML = '<div id="nc-root"></div>';
+     }
+     
+     // Initialize CMS with inline configuration
+     (window as any).CMS_MANUAL_INIT = true;
+     
+     (window as any).CMS.init({
+       backend: {
+         name: 'git-gateway',
+         branch: 'main'
+       },
+       media_folder: 'public/images',
+       public_folder: '/images',
+       collections: [
+         {
+           name: 'site',
+           label: 'Site Settings',
+           files: [
+             {
+               label: 'Main Profile',
+               name: 'profile',
+               file: 'src/data/profile.json',
+               fields: [
+                 {
+                   label: 'Artist Name',
+                   name: 'artistName',
+                   widget: 'string',
+                   default: 'TumblysArt'
+                 },
+                 {
+                   label: 'Profile Image',
+                   name: 'profileImage',
+                   widget: 'image',
+                   default: '/JumpingForJoy.png'
+                 },
+                 {
+                   label: 'Navigation Buttons',
+                   name: 'buttons',
+                   widget: 'list',
+                   min: 1,
+                   max: 6,
+                   fields: [
+                     {
+                       label: 'Button Text',
+                       name: 'text',
+                       widget: 'string'
+                     },
+                     {
+                       label: 'Link Destination',
+                       name: 'url',
+                       widget: 'string'
+                     },
+                     {
+                       label: 'Button Color',
+                       name: 'color',
+                       widget: 'select',
+                       default: 'white',
+                       options: [
+                         { label: 'White', value: 'white' },
+                         { label: 'Purple', value: 'purple' },
+                         { label: 'Pink', value: 'pink' },
+                         { label: 'Blue', value: 'blue' },
+                         { label: 'Green', value: 'green' }
+                       ]
+                     },
+                     {
+                       label: 'Text Color',
+                       name: 'textColor',
+                       widget: 'select',
+                       default: 'black',
+                       options: [
+                         { label: 'Black', value: 'black' },
+                         { label: 'White', value: 'white' },
+                         { label: 'Gray', value: 'gray' }
+                       ]
+                     }
+                   ]
+                 }
+               ]
+             }
+           ]
+         }
+       ]
+     });
 
-    // Show error message
-    function showError(message: any) {
+     // Add logout button
+     setTimeout(() => {
+       addLogoutButton();
+     }, 2000);
+   }
 
-      const appElement = document.getElementById('app');
-      if (appElement) {
-        appElement.innerHTML = `
-          <div style="text-align: center; padding: 50px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-            <div style="background: #fee2e2; border: 1px solid #fecaca; color: #dc2626; padding: 20px; border-radius: 8px; max-width: 500px; margin: 0 auto;">
-              <h2 style="margin: 0 0 10px 0;">❌ Error</h2>
-              <p style="margin: 0 0 20px 0;">${message}</p>
-              <button 
-                onclick="location.reload()" 
-                style="background: #dc2626; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer;"
-              >
-                Try Again
-              </button>
-            </div>
-          </div>
-        `;
-      }
-    }
-    
-    // Initialize Decap CMS with inline config
-    function initCMS() {
-      console.log('Initializing Decap CMS...');
-      const appElement = document.getElementById('app');
-      if (appElement) {
-        appElement.innerHTML = '<div id="nc-root"></div>';
-      }
-      
-      // Initialize CMS with inline configuration
-      (window as any).CMS_MANUAL_INIT = true;
+   // Add logout button
+   function addLogoutButton() {
+     const logoutBtn = document.createElement('button');
+     logoutBtn.innerHTML = '🚪 Logout';
+     logoutBtn.style.cssText = `
+       position: fixed; 
+       top: 15px; 
+       right: 15px; 
+       z-index: 9999; 
+       background: #dc2626; 
+       color: white; 
+       border: none; 
+       padding: 8px 16px; 
+       border-radius: 6px; 
+       cursor: pointer; 
+       font-size: 14px;
+       box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+     `;
+     
+     logoutBtn.addEventListener('click', () => {
+       if (confirm('Are you sure you want to log out?')) {
+         auth0Client.logout({ 
+           logoutParams: { 
+             returnTo: window.location.origin + '/admin'
+           }
+         });
+       }
+     });
+     
+     document.body.appendChild(logoutBtn);
+   }
 
-      window.CMS.init({
-        config: {
-          backend: {
-            name: 'git-gateway',
-            branch: 'main'
-          },
-          media_folder: 'public/images',
-          public_folder: '/images',
-          collections: [
-            {
-              name: 'site',
-              label: 'Site Settings',
-              files: [
-                {
-                  label: 'Main Profile',
-                  name: 'profile',
-                  file: 'src/data/profile.json',
-                  fields: [
-                    {
-                      label: 'Artist Name',
-                      name: 'artistName',
-                      widget: 'string',
-                      default: 'TumblysArt'
-                    },
-                    {
-                      label: 'Profile Image',
-                      name: 'profileImage',
-                      widget: 'image',
-                      default: '/JumpingForJoy.png'
-                    },
-                    {
-                      label: 'Navigation Buttons',
-                      name: 'buttons',
-                      widget: 'list',
-                      min: 1,
-                      max: 6,
-                      fields: [
-                        {
-                          label: 'Button Text',
-                          name: 'text',
-                          widget: 'string'
-                        },
-                        {
-                          label: 'Link Destination',
-                          name: 'url',
-                          widget: 'string'
-                        },
-                        {
-                          label: 'Button Color',
-                          name: 'color',
-                          widget: 'select',
-                          default: 'white',
-                          options: [
-                            { label: 'White', value: 'white' },
-                            { label: 'Purple', value: 'purple' },
-                            { label: 'Pink', value: 'pink' },
-                            { label: 'Blue', value: 'blue' },
-                            { label: 'Green', value: 'green' }
-                          ]
-                        },
-                        {
-                          label: 'Text Color',
-                          name: 'textColor',
-                          widget: 'select',
-                          default: 'black',
-                          options: [
-                            { label: 'Black', value: 'black' },
-                            { label: 'White', value: 'white' },
-                            { label: 'Gray', value: 'gray' }
-                          ]
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      });
+   // Add CSS
+   const style = document.createElement('style');
+   style.textContent = `
+     @keyframes spin {
+       0% { transform: rotate(0deg); }
+       100% { transform: rotate(360deg); }
+     }
+   `;
+   document.head.appendChild(style);
 
-      // Add logout button
-      setTimeout(() => {
-        addLogoutButton();
-      }, 2000);
-    }
-
-    // Add logout button
-    function addLogoutButton() {
-      const logoutBtn = document.createElement('button');
-      logoutBtn.innerHTML = '🚪 Logout';
-      logoutBtn.style.cssText = `
-        position: fixed; 
-        top: 15px; 
-        right: 15px; 
-        z-index: 9999; 
-        background: #dc2626; 
-        color: white; 
-        border: none; 
-        padding: 8px 16px; 
-        border-radius: 6px; 
-        cursor: pointer; 
-        font-size: 14px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      `;
-      
-      logoutBtn.addEventListener('click', () => {
-        if (confirm('Are you sure you want to log out?')) {
-          auth0Client.logout({ 
-            logoutParams: { 
-              returnTo: window.location.origin + '/admin'
-            }
-          });
-        }
-      });
-      
-      document.body.appendChild(logoutBtn);
-    }
-
-    // Add CSS
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-    `;
-    document.head.appendChild(style);
-
-    // Start initialization
-    init();
-  </script>
+   // Start initialization
+   init();
+ </script>
 </body>
 </html>
