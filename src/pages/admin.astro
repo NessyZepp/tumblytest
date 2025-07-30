@@ -1,0 +1,285 @@
+---
+// src/pages/admin.astro
+const auth0Domain = import.meta.env.PUBLIC_AUTH0_DOMAIN;
+const auth0ClientId = import.meta.env.PUBLIC_AUTH0_CLIENT_ID;
+
+// Check if environment variables are set
+if (!auth0Domain || !auth0ClientId) {
+  throw new Error('Auth0 environment variables are not set. Please check your .env file.');
+}
+---
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Content Manager - TumblysArt</title>
+  <!-- Auth0 SDK -->
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.1/auth0-spa-js.production.js"></script>
+</head>
+<body>
+  <div id="app">
+    <div id="loading" style="text-align: center; padding: 50px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      <h2 style="color: #6366f1;">Loading CMS...</h2>
+      <p style="color: #666;">Authenticating with Auth0...</p>
+      <div style="margin-top: 20px;">
+        <div style="display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #6366f1; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Decap CMS -->
+  <script src="https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js"></script>
+  
+  <script>
+    // Auth0 configuration - Now using environment variables safely
+    const auth0Config = {
+      domain: '${auth0Domain}',
+      clientId: '${auth0ClientId}',
+      authorizationParams: {
+        redirect_uri: window.location.origin + '/admin'
+      }
+    };
+
+    let auth0Client: any;
+
+    // Initialize Auth0
+    async function initAuth0(): Promise<void> {
+      try {
+        console.log('Initializing Auth0 with domain:', auth0Config.domain);
+        auth0Client = await (window as any).auth0.createAuth0Client(auth0Config);
+        
+        // Check if user is returning from Auth0 callback
+        if (window.location.search.includes('code=') || window.location.search.includes('error=')) {
+          console.log('Handling Auth0 callback...');
+          await auth0Client.handleRedirectCallback();
+          // Clean up the URL
+          window.history.replaceState({}, document.title, '/admin');
+        }
+
+        // Check if user is authenticated
+        const isAuthenticated = await auth0Client.isAuthenticated();
+        console.log('Is authenticated:', isAuthenticated);
+        
+        if (isAuthenticated) {
+          const user = await auth0Client.getUser();
+          console.log('Authenticated user:', user);
+          initCMS();
+        } else {
+          showLoginButton();
+        }
+      } catch (error) {
+        console.error('Auth0 initialization error:', error);
+        showError('Authentication failed: ' + (error as Error).message);
+      }
+    }
+
+    // Show login button
+    function showLoginButton(): void {
+      const appElement = document.getElementById('app');
+      if (appElement) {
+        appElement.innerHTML = `
+          <div style="text-align: center; padding: 50px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);">
+              <h1 style="margin: 0 0 20px 0; font-size: 28px; font-weight: 600;">TumblysArt CMS</h1>
+              <p style="margin: 0 0 30px 0; opacity: 0.9; font-size: 16px;">Manage your website content</p>
+              <button 
+                id="loginBtn" 
+                style="background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.3); padding: 12px 24px; border-radius: 8px; font-size: 16px; cursor: pointer; transition: all 0.3s; backdrop-filter: blur(10px);"
+              >
+                🔐 Log In to Continue
+              </button>
+            </div>
+            <p style="margin-top: 20px; color: #666; font-size: 14px;">Secure authentication powered by Auth0</p>
+          </div>
+        `;
+      }
+      
+      const loginBtn = document.getElementById('loginBtn');
+      if (loginBtn) {
+        loginBtn.addEventListener('click', () => {
+          console.log('Starting Auth0 login...');
+          auth0Client.loginWithRedirect();
+        });
+      }
+    }
+
+    // Show error message
+    function showError(message: string): void {
+      const appElement = document.getElementById('app');
+      if (appElement) {
+        appElement.innerHTML = `
+          <div style="text-align: center; padding: 50px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <div style="background: #fee2e2; border: 1px solid #fecaca; color: #dc2626; padding: 20px; border-radius: 8px; max-width: 500px; margin: 0 auto;">
+              <h2 style="margin: 0 0 10px 0;">❌ Authentication Error</h2>
+              <p style="margin: 0 0 20px 0;">${message}</p>
+              <button 
+                onclick="location.reload()" 
+                style="background: #dc2626; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer;"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        `;
+      }
+    }
+    
+    // Initialize Decap CMS
+    function initCMS(): void {
+      console.log('Initializing Decap CMS...');
+      const appElement = document.getElementById('app');
+      if (appElement) {
+        appElement.innerHTML = '<div id="nc-root"></div>';
+      }
+      
+      // Configure Decap CMS
+      (window as any).CMS_MANUAL_INIT = true;
+      
+      (window as any).CMS.init({
+        config: {
+          backend: {
+            name: 'git-gateway',
+            branch: 'main'
+          },
+          media_folder: 'public/images',
+          public_folder: '/images',
+          collections: [
+            {
+              name: 'site',
+              label: 'Site Settings',
+              files: [
+                {
+                  label: 'Main Profile',
+                  name: 'profile',
+                  file: 'src/data/profile.json',
+                  fields: [
+                    {
+                      label: 'Artist Name',
+                      name: 'artistName',
+                      widget: 'string',
+                      default: 'TumblysArt'
+                    },
+                    {
+                      label: 'Profile Image',
+                      name: 'profileImage',
+                      widget: 'image',
+                      default: '/JumpingForJoy.png'
+                    },
+                    {
+                      label: 'Navigation Buttons',
+                      name: 'buttons',
+                      widget: 'list',
+                      min: 1,
+                      max: 6,
+                      fields: [
+                        {
+                          label: 'Button Text',
+                          name: 'text',
+                          widget: 'string'
+                        },
+                        {
+                          label: 'Link Destination',
+                          name: 'url',
+                          widget: 'string'
+                        },
+                        {
+                          label: 'Button Color',
+                          name: 'color',
+                          widget: 'select',
+                          default: 'white',
+                          options: [
+                            { label: 'White', value: 'white' },
+                            { label: 'Purple', value: 'purple' },
+                            { label: 'Pink', value: 'pink' },
+                            { label: 'Blue', value: 'blue' },
+                            { label: 'Green', value: 'green' }
+                          ]
+                        },
+                        {
+                          label: 'Text Color',
+                          name: 'textColor',
+                          widget: 'select',
+                          default: 'black',
+                          options: [
+                            { label: 'Black', value: 'black' },
+                            { label: 'White', value: 'white' },
+                            { label: 'Gray', value: 'gray' }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      });
+
+      // Add logout button after CMS loads
+      setTimeout(() => {
+        addLogoutButton();
+      }, 2000);
+    }
+
+    // Add logout button to CMS interface
+    function addLogoutButton(): void {
+      const logoutBtn = document.createElement('button');
+      logoutBtn.innerHTML = '🚪 Logout';
+      logoutBtn.style.cssText = `
+        position: fixed; 
+        top: 15px; 
+        right: 15px; 
+        z-index: 9999; 
+        background: #dc2626; 
+        color: white; 
+        border: none; 
+        padding: 8px 16px; 
+        border-radius: 6px; 
+        cursor: pointer; 
+        font-size: 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        transition: all 0.2s;
+      `;
+      
+      logoutBtn.addEventListener('mouseover', () => {
+        logoutBtn.style.background = '#b91c1c';
+        logoutBtn.style.transform = 'translateY(-1px)';
+      });
+      
+      logoutBtn.addEventListener('mouseout', () => {
+        logoutBtn.style.background = '#dc2626';
+        logoutBtn.style.transform = 'translateY(0)';
+      });
+      
+      logoutBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to log out?')) {
+          auth0Client.logout({ 
+            logoutParams: { 
+              returnTo: window.location.origin + '/admin'
+            }
+          });
+        }
+      });
+      
+      document.body.appendChild(logoutBtn);
+    }
+
+    // Add loading animation CSS
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Start the authentication flow
+    console.log('Starting Auth0 initialization...');
+    initAuth0();
+  </script>
+</body>
+</html>
