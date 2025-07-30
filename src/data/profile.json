@@ -1,0 +1,30 @@
+{
+  "artistName": "TumblysArt",
+  "profileImage": "/JumpingForJoy.png",
+  "buttons": [
+    {
+      "text": "Portfolio",
+      "url": "/portfolio",
+      "color": "white",
+      "textColor": "black"
+    },
+    {
+      "text": "Commissions",
+      "url": "/commissions",
+      "color": "white",
+      "textColor": "black"
+    },
+    {
+      "text": "About",
+      "url": "/about",
+      "color": "white",
+      "textColor": "black"
+    },
+    {
+      "text": "Contact",
+      "url": "/contact",
+      "color": "white",
+      "textColor": "black"
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+---
+// practice.astro
+import Layout from '../layouts/Layout.astro'
+import profileData from '../data/profile.json'
+
+const { artistName, profileImage, buttons } = profileData
+
+// Function to get the right color classes
+function getColorClasses(color: string, textColor: string): string {
+  const backgrounds: { [key: string]: string } = {
+    white: 'bg-white',
+    purple: 'bg-purple-600 hover:bg-purple-700',
+    pink: 'bg-pink-600 hover:bg-pink-700',
+    blue: 'bg-blue-600 hover:bg-blue-700',
+    green: 'bg-green-600 hover:bg-green-700'
+  }
+  
+  const textColors: { [key: string]: string } = {
+    black: 'text-black',
+    white: 'text-white',
+    gray: 'text-gray-700'
+  }
+  
+  return `${backgrounds[color] || 'bg-white'} ${textColors[textColor] || 'text-black'}`
+}
+---
+
+<Layout title="TumblysArt">
+<body>
+
+<div class="flex justify-center items-center h-screen">
+    <div class="bg-gray-700 rounded-md border-4 border-gray-400 h-3/4 w-1/2 p-4 flex flex-col items-center">
+        <img class="size-48" src={profileImage} alt={artistName}>
+        <h1 class="text-6xl mb-4">{artistName}</h1>
+        
+        <!-- Dynamic buttons from CMS -->
+        {buttons.map((button: any) => (
+            <button class={`mb-4 flex justify-center break-words border-4 w-48 min-h-18 rounded-md transition-colors ${getColorClasses(button.color, button.textColor)}`}>
+                <a class="leading-[2.5rem] text-3xl line-clamp-3" href={button.url}>
+                    {button.text}
+                </a>  
+            </button>
+        ))}
+    </div>
+</div>
+
+</body>
+</Layout>
