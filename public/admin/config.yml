@@ -1,0 +1,25 @@
+backend:
+  name: git-gateway
+  branch: main
+
+media_folder: "public/images"
+public_folder: "/images"
+
+collections:
+  - name: "site"
+    label: "Site Settings"
+    files:
+      - label: "Profile"
+        name: "profile"
+        file: "src/data/profile.json"
+        fields:
+          - {label: "Artist Name", name: "artistName", widget: "string"}
+          - {label: "Profile Image", name: "profileImage", widget: "image"}
+          - label: "Navigation Buttons"
+            name: "buttons"
+            widget: "list"
+            fields:
+              - {label: "Button Text", name: "text", widget: "string"}
+              - {label: "Link", name: "url", widget: "string"}
+              - {label: "Color", name: "color", widget: "select", options: ["white", "purple", "pink", "blue", "green"]}
+              - {label: "Text Color", name: "textColor", widget: "select", options: ["black", "white", "gray"]}
